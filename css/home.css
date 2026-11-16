@@ -1,0 +1,216 @@
+.hero {
+  padding: 60px 0 40px;
+}
+
+.path {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text-light);
+  margin: 0 0 30px;
+}
+
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--red);
+  border: 1px solid var(--red);
+  padding: 3px 10px;
+  margin: 0 0 16px;
+}
+
+.hero h1 {
+  font-size: 56px;
+}
+
+.intro {
+  font-size: 20px;
+  color: var(--text-light);
+  margin: 16px 0 0;
+}
+
+.hero-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 15px;
+}
+
+.hero-links span {
+  color: var(--text-light);
+}
+
+.section {
+  padding: 40px 0;
+  border-top: 1px solid var(--border);
+}
+
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.section-title .num {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--red);
+}
+
+.section-title h2 {
+  font-size: 26px;
+}
+
+.section-title .more {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.card {
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.card:hover {
+  border-color: var(--red);
+}
+
+.card h3 {
+  font-size: 18px;
+  margin: 6px 0 8px;
+}
+
+.card p {
+  margin: 0 0 10px;
+}
+
+.card p.small {
+  margin: 0;
+}
+
+.subtitle {
+  margin: 36px 0 4px;
+  font-family: var(--mono);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-light);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.list li:last-child {
+  border-bottom: none;
+}
+
+.list h3 {
+  font-size: 18px;
+}
+
+.list p {
+  margin: 4px 0 0;
+  color: var(--text-light);
+}
+
+.small {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.skills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.skills h3 {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--red);
+}
+
+.skills ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.tools {
+  margin-top: 24px;
+}
+
+.tools code {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  margin: 0 4px 6px 0;
+}
+
+.note {
+  margin-top: 16px;
+  color: var(--text-light);
+}
+
+.boxes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.box {
+  display: block;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+
+a.box:hover {
+  border-color: var(--red);
+  color: var(--text);
+}
+
+.box p {
+  margin: 6px 0 0;
+  color: var(--text-light);
+}
+
+@media (max-width: 600px) {
+  .hero h1 {
+    font-size: 40px;
+  }
+
+  .cards,
+  .skills,
+  .boxes {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HomeLab SIEM - gallbladder</title>
+  <meta name="description" content="Building a segmented lab with Active Directory and a Wazuh SIEM on Apache CloudStack.">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;700&display=swap">
+
+  <link rel="stylesheet" href="../css/da.css">
+  <link rel="stylesheet" href="../css/post.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container">
+      <a class="logo" href="../index.html">GALLBLADDER</a>
+      <ul class="nav">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../index.html#projects">Projects</a></li>
+        <li><a href="../index.html#posts">Blog</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <main class="container post">
+
+    <a class="back" href="../index.html#posts">← Back</a>
+
+    <p class="post-meta">2026-10-12 · Project report</p>
+    <h1>HomeLab SIEM</h1>
+    <p class="post-intro">Centralized detection and network segmentation on Apache CloudStack: a 3-tier VPC, a hardened Active Directory and a Wazuh SIEM collecting logs from three operating systems.</p>
+
+    <div class="tags">
+      <span>Blue team</span><span>Wazuh</span><span>Active Directory</span><span>Segmentation</span><span>CloudStack</span>
+    </div>
+
+    <div class="box-info">
+      <p><strong>TL;DR.</strong> One VPC split into three trust zones, built entirely from the command line with CloudMonkey. A Windows Server 2022 domain controller, hardened. The risky zone is isolated from the trusted zone, verified with TCP tests. Wazuh 4.14.8 runs with three active agents on Windows, Debian and Ubuntu. The final audit also lists what is not done yet.</p>
+    </div>
+
+    <h2>1. Context and goals</h2>
+    <p>This is a blue team project: the goal is not to attack, but to <em>see</em>. A SIEM (Security Information and Event Management) gathers the logs of a whole network in one place so you can spot unusual activity.</p>
+    <p>The lab was designed to show:</p>
+    <ul>
+      <li><strong>Network segmentation</strong>: one VPC cut into three tiers by trust level.</li>
+      <li><strong>Active Directory</strong>: a real Windows Server domain controller with an OU, users and a security policy.</li>
+      <li><strong>Hardening</strong>: on the directory side and on the network side.</li>
+      <li><strong>Centralized detection</strong>: a Wazuh SIEM collecting logs from the key machines. This is the core of the project.</li>
+      <li><strong>A contained risky zone</strong>: offensive machines kept away from the trusted network.</li>
+    </ul>
+
+    <h3>Design choices</h3>
+    <ul>
+      <li><strong>One VPC with tiers, not several VPCs.</strong> Every segment needs to reach the SIEM in a controlled way. Separate VPCs would have blocked that.</li>
+      <li><strong>A real Windows Server, not Samba.</strong> To get the real Windows security logs.</li>
+      <li><strong>No Kali VM.</strong> Offensive tools go on a dedicated Debian VM, so I know exactly what software lives in the risky zone.</li>
+    </ul>
+
+    <h2>2. Architecture</h2>
+    <p>A single VPC called <code>lab</code> (<code>10.10.0.0/16</code>) split into three <code>/24</code> tiers. The CloudStack virtual router handles the gateway, DHCP, DNS, NAT and ACL filtering between tiers. Each tier gets its own VLAN automatically.</p>
+
+    <figure class="wide">
+      <img src="../assets/siem/network-diagram.png" alt="Network diagram: a CloudStack VPC with three tiers, enterprise in green, SIEM in blue, lab in red">
+    </figure>
+    <p class="post-meta">Network diagram. Scroll sideways on a phone.</p>
+
+    <h3>Segmentation logic</h3>
+    <ul>
+      <li><strong>Enterprise</strong> (<code>10.10.10.0/24</code>): what we protect. The domain controller and a user workstation.</li>
+      <li><strong>SIEM</strong> (<code>10.10.20.0/24</code>): monitoring. It receives logs from everyone. Target rule: <em>a collector never pivots to what it watches</em>. Not enforced yet, see the audit.</li>
+      <li><strong>Lab</strong> (<code>10.10.30.0/24</code>): everything risky or offensive, grouped in one segment.</li>
+    </ul>
+
+    <div class="box-info">
+      <p><strong>Platform limit.</strong> The VPC is capped at three tiers. Finer isolation, for example between reverse-engineering VMs and the target, is planned with local firewalls (nftables, Windows Firewall).</p>
+    </div>
+
+    <h3>Inventory</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>VM</th><th>Tier</th><th>IP</th><th>OS / role</th><th>Status</th></tr>
+        <tr><td>winserv22-ADDS</td><td>Enterprise</td><td>10.10.10.10</td><td>Windows Server 2022, DC + DNS</td><td class="ok">Running, agent active</td></tr>
+        <tr><td>wincli-client</td><td>Enterprise</td><td>10.10.10.20</td><td>Windows 10 workstation</td><td>Domain joined, no agent</td></tr>
+        <tr><td>deb-siem</td><td>SIEM</td><td>10.10.20.10</td><td>Debian 12, Wazuh all-in-one</td><td class="ok">Running</td></tr>
+        <tr><td>deb-ia</td><td>SIEM</td><td>10.10.20.30</td><td>Debian 12, monitored host</td><td class="ok">Agent active</td></tr>
+        <tr><td>deb-cible</td><td>Lab</td><td>10.10.30.20</td><td>Debian 12, target</td><td>Stopped</td></tr>
+        <tr><td>wind10-rev</td><td>Lab</td><td>10.10.30.30</td><td>Windows 10, reverse</td><td>Stopped</td></tr>
+        <tr><td>deb-rev</td><td>Lab</td><td>10.10.30.40</td><td>Debian 12, reverse</td><td>Stopped</td></tr>
+        <tr><td>deb-atk</td><td>Lab</td><td>10.10.30.50</td><td>Debian 12, attack</td><td>Stopped</td></tr>
+        <tr><td>osint-ubuntu</td><td>Lab</td><td>10.10.30.60</td><td>Ubuntu 24.04, OSINT</td><td class="ok">Agent active</td></tr>
+        <tr><td>arch-perso</td><td>Lab</td><td>10.10.30.70</td><td>Arch Linux, personal</td><td>Stopped</td></tr>
+      </table>
+    </div>
+
+    <h3>Access</h3>
+    <ul>
+      <li>CloudStack web interface through the school VPN when off campus.</li>
+      <li>Windows VMs through the noVNC web console.</li>
+      <li>Linux VMs through SSH with a key, exposed with port forwarding for three machines.</li>
+    </ul>
+
+    <div class="box-warn">
+      <p><strong>Limit.</strong> The port forwards have no source restriction, so they are reachable from the whole school network. Password login is disabled, but root login with a key is still allowed. The most exposed machine is <code>deb-siem</code>, the one that should be the best protected.</p>
+    </div>
+
+    <h2>3. Active Directory</h2>
+    <ul>
+      <li><strong>Domain:</strong> <code>lab.local</code> (NetBIOS <code>LAB</code>), single forest.</li>
+      <li><strong>Domain controller:</strong> <code>winserv22-ADDS</code>, AD DS + integrated DNS, static IP.</li>
+      <li><strong>OU:</strong> <code>Utilisateurs</code>, with three test users.</li>
+      <li><strong>Client:</strong> <code>wincli-client</code> joined to the domain. A domain user login was tested and works.</li>
+    </ul>
+    <p>The directory is kept small on purpose: enough to produce real authentication events. There is no split yet between admin and user accounts.</p>
+
+    <h2>4. Hardening</h2>
+
+    <h3>Active Directory</h3>
+    <ul>
+      <li><strong>Password policy:</strong> 12 characters minimum, complexity on, lockout after 5 failures (15 min), history of 24.</li>
+      <li><strong>Advanced audit:</strong> Logon/Logoff and Account Management, success and failure. The DC logs account creation (4720) and lockout (4740). A failed logon (4625) is logged on the machine where it fails; the DC only sees the Kerberos/NTLM failure (4771/4776), which is not enabled here.</li>
+      <li><strong>Attack surface:</strong> SMBv1 disabled.</li>
+      <li><strong>GPO <code>LAB-Durci</code>:</strong> LLMNR disabled (abused by Responder-style attacks) and command line included in process creation events (4688). That second setting only works once the "Process Creation" audit subcategory is enabled too, which is still to do.</li>
+    </ul>
+
+    <h3>Network: targeted deny between risky zone and trusted zone</h3>
+    <p>At first the ACLs were <code>default_allow</code>. Three dedicated lists (<code>acl-entreprise</code>, <code>acl-siem</code>, <code>acl-lab</code>) replaced it. The strategy for now: block all traffic between <strong>lab</strong> and <strong>enterprise</strong>, both ways. Other flows stay open.</p>
+
+    <div class="table-wrap">
+      <table>
+        <tr><th>List</th><th>#</th><th>Dir.</th><th>CIDR</th><th>Action</th><th>Effect</th></tr>
+        <tr><td>acl-entreprise</td><td>10</td><td>In</td><td>10.10.30.0/24</td><td class="bad">Deny</td><td>Lab blocked</td></tr>
+        <tr><td>acl-entreprise</td><td>20</td><td>In</td><td>0.0.0.0/0</td><td>Allow</td><td></td></tr>
+        <tr><td>acl-entreprise</td><td>100</td><td>Out</td><td>10.10.30.0/24</td><td class="bad">Deny</td><td>To lab blocked</td></tr>
+        <tr><td>acl-entreprise</td><td>200</td><td>Out</td><td>0.0.0.0/0</td><td>Allow</td><td></td></tr>
+        <tr><td>acl-siem</td><td>10</td><td>In</td><td>0.0.0.0/0</td><td>Allow</td><td>No filtering</td></tr>
+        <tr><td>acl-siem</td><td>100</td><td>Out</td><td>0.0.0.0/0</td><td>Allow</td><td>No filtering</td></tr>
+        <tr><td>acl-lab</td><td>10</td><td>In</td><td>0.0.0.0/0</td><td>Allow</td><td></td></tr>
+        <tr><td>acl-lab</td><td>100</td><td>Out</td><td>10.10.10.0/24</td><td class="bad">Deny</td><td>To enterprise blocked</td></tr>
+        <tr><td>acl-lab</td><td>200</td><td>Out</td><td>0.0.0.0/0</td><td>Allow</td><td>Internet open</td></tr>
+      </table>
+    </div>
+
+    <h3>Proving the isolation</h3>
+    <p>A ping is not enough: Windows Server drops incoming ICMP by default, so the ping would fail even without the ACL. I tested TCP connections to the ports the DC really listens on, from <code>osint-ubuntu</code> in the lab tier:</p>
+<pre><code># from osint-ubuntu (lab tier)
+DC:53    closed/filtered   DC:88    closed/filtered   DC:135   closed/filtered
+DC:389   closed/filtered   DC:445   closed/filtered   DC:3389  closed/filtered
+DC:5985  closed/filtered
+client:445 closed/filtered   client:3389 closed/filtered
+
+# counter-test from deb-siem (SIEM tier, not filtered)
+10.10.10.10:445 OPEN</code></pre>
+    <p>The counter-test is what matters: port 445 answers from the SIEM tier but not from the lab tier. So the block comes from the ACL, not from the Windows firewall.</p>
+
+    <h2>5. Wazuh SIEM</h2>
+    <p>Wazuh 4.14.8, all-in-one on <code>deb-siem</code>: manager (collection and correlation), indexer (storage and search) and dashboard on one machine. Installed with the official script. The dashboard is served over HTTPS on port 443.</p>
+<pre><code>/var/ossec/bin/wazuh-control status   # main services running
+/var/ossec/bin/wazuh-control info     # version 4.14.8</code></pre>
+
+    <div class="box-info">
+      <p><strong>Sizing.</strong> 4 vCPU, 4 GB RAM, 40 GB disk. Indexer Java heap set to 1 GB. During the audit only about 120 MB of RAM was free, with no swap. No out-of-memory crash in seven days, but the margin is close to zero.</p>
+    </div>
+
+    <h2>6. Agents and log collection</h2>
+    <p>Each monitored machine runs an agent that sends its logs to the manager over TCP 1514/1515.</p>
+
+    <div class="table-wrap">
+      <table>
+        <tr><th>ID</th><th>Agent</th><th>System</th><th>Telemetry</th></tr>
+        <tr><td>001</td><td>winserv22-ADDS</td><td>Windows Server 2022</td><td>Security event log (AD events)</td></tr>
+        <tr><td>002</td><td>deb-ia</td><td>Debian 12</td><td>Linux system logs</td></tr>
+        <tr><td>003</td><td>osint-ubuntu</td><td>Ubuntu 24.04</td><td>Linux system logs</td></tr>
+      </table>
+    </div>
+    <p>Three of the ten machines are monitored. <code>wincli-client</code> and <code>deb-cible</code> don't have an agent yet.</p>
+
+    <figure>
+      <img src="../assets/siem/agent-install.png" alt="PowerShell: forcing TLS 1.2, downloading the Wazuh agent, installing it with the manager address and starting the service">
+      <figcaption>Installing the agent on the domain controller and starting the service.</figcaption>
+    </figure>
+
+    <h3>Result: three active agents</h3>
+    <p>The manager shows three agents <strong>Active</strong> on three OS, none disconnected. Collection works: on October 12 the alerts file had 2,393 alerts from the DC, 3,311 from osint-ubuntu, 215 from deb-ia and 231 from the manager itself.</p>
+
+    <figure>
+      <img src="../assets/siem/agents-active.png" alt="Wazuh dashboard: 3 active agents, 0 disconnected, on Windows, Debian and Ubuntu">
+      <figcaption>Wazuh dashboard: three active agents, none disconnected.</figcaption>
+    </figure>
+
+    <h3>Collecting Windows security logs</h3>
+    <p>On the DC, the agent reads the Windows <em>Security</em> channel. Without it, AD authentication events never reach the SIEM:</p>
+<pre><code>&lt;ossec_config&gt;
+  &lt;client&gt;
+    &lt;server&gt;
+      &lt;address&gt;10.10.20.10&lt;/address&gt;
+    &lt;/server&gt;
+  &lt;/client&gt;
+  &lt;localfile&gt;
+    &lt;location&gt;Security&lt;/location&gt;
+    &lt;log_format&gt;eventchannel&lt;/log_format&gt;
+  &lt;/localfile&gt;
+&lt;/ossec_config&gt;</code></pre>
+
+    <div class="box-warn">
+      <p><strong>Problem I hit.</strong> My first config put the collection block <em>after</em> the closing <code>&lt;/ossec_config&gt;</code> tag. The XML was invalid and the DC agent showed "disconnected". Switching the ACL on and off ruled out the network, which pointed to the config file. A clean <code>ossec.conf</code> and a service restart brought the agent back to Active.</p>
+    </div>
+
+    <h2>7. What the SIEM actually sees</h2>
+    <div class="table-wrap">
+      <table>
+        <tr><th>Source</th><th>Seen in the SIEM</th><th>Configured, not seen yet</th></tr>
+        <tr><td>winserv22-ADDS</td><td>Windows logons and logoffs, 2,393 alerts in a day</td><td>Account creation (4720), lockout (4740), local failed logon (4625)</td></tr>
+        <tr><td>deb-ia</td><td>Linux system and auth logs (215 alerts)</td><td></td></tr>
+        <tr><td>osint-ubuntu</td><td>Linux system and auth logs (3,311 alerts)</td><td></td></tr>
+      </table>
+    </div>
+    <p>The collection chain works end to end for successful authentication. No "abnormal" event (failure, lockout, account creation) has been triggered yet to prove detection. That's the first fix on the list.</p>
+
+    <h2>8. Problems and fixes</h2>
+    <div class="table-wrap">
+      <table>
+        <tr><th>Problem</th><th>Cause</th><th>Fix</th></tr>
+        <tr><td>DC agent disconnected</td><td>Invalid <code>ossec.conf</code></td><td>Rewrote a clean file, restarted the service</td></tr>
+        <tr><td>Disk full on deb-siem</td><td>Initial volume too small (3 GB)</td><td><code>cmk resize volume</code>, then <code>growpart</code> + <code>resize2fs</code> (40 GB)</td></tr>
+        <tr><td>Wazuh install stuck</td><td>APT lock (unattended-upgrades)</td><td>Stopped APT timers, <code>dpkg --configure -a</code>, resumed</td></tr>
+        <tr><td>Windows agent download: 403</td><td>TLS negotiation</td><td>Forced TLS 1.2 before the request</td></tr>
+        <tr><td>Broken PowerShell paste</td><td>UK keyboard in the noVNC console</td><td>Short commands, no fragile characters</td></tr>
+        <tr><td>Linux agent: missing GPG key</td><td>Minimal Debian template</td><td>Installed <code>gnupg</code> and <code>curl</code> first</td></tr>
+        <tr><td>vCPU quota full (20/20)</td><td>All VMs at 2 to 4 vCPU</td><td>Scaled one VM down with <code>cmk scale</code></td></tr>
+      </table>
+    </div>
+
+    <h2>9. Audit of the real state</h2>
+    <p>Before handing in the report, I audited the lab read-only: <code>cmk</code> for the platform, SSH for the Linux VMs, TCP tests between tiers.</p>
+
+    <h3>Confirmed</h3>
+    <ul>
+      <li>Three-tier VPC, each tier with its own ACL list.</li>
+      <li>Lab ↔ enterprise isolation, both ways, checked with TCP and a counter-test.</li>
+      <li>Wazuh running, three active agents on three OS, thousands of alerts a day.</li>
+      <li>SSH key-only on the reachable Linux VMs.</li>
+    </ul>
+
+    <h3>Gaps</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>Finding</th><th>Evidence</th><th>Severity</th></tr>
+        <tr><td>SIEM tier not filtered: it can reach the enterprise and lab tiers</td><td><code>acl-siem</code> allows all; DC:445 and osint:22 open from the SIEM tier</td><td class="bad">High</td></tr>
+        <tr><td>The risky zone can reach the SIEM's SSH and dashboard</td><td>From osint-ubuntu: siem:22 and siem:443 open</td><td class="bad">High</td></tr>
+        <tr><td>The risky zone has full Internet access</td><td><code>acl-lab</code> rule 200; outbound HTTPS works</td><td class="bad">High</td></tr>
+        <tr><td>Admin access with no source restriction</td><td>Port forwards without CIDR</td><td>Medium</td></tr>
+        <tr><td>osint-ubuntu disk almost full</td><td>2.4 GB, 98% used</td><td>Medium</td></tr>
+        <tr><td>No Linux hardening</td><td>No nftables, auditd off, root allowed with a key</td><td>Medium</td></tr>
+        <tr><td>deb-siem RAM very tight</td><td>120 MB free, no swap</td><td>Medium</td></tr>
+        <tr><td>Detection of abnormal events not proven</td><td>No 4625/4720/4740 in the day's alerts</td><td>Medium</td></tr>
+        <tr><td>No custom detection rule</td><td><code>local_rules.xml</code> only has the default example</td><td>Low</td></tr>
+      </table>
+    </div>
+
+    <h2>10. Next steps</h2>
+    <h3>Priority fixes</h3>
+    <ol>
+      <li><strong>Filter the SIEM tier:</strong> only accept agent ports (1514-1515) from the VPC, and admin (22, 443) from the admin workstation only. Block the SIEM from opening connections to other tiers with a stateful local firewall, so the "collector never pivots" rule is real.</li>
+      <li><strong>Lock down the risky zone:</strong> replace the general outbound allow in <code>acl-lab</code> with a deny, and only open agent ports to the SIEM.</li>
+      <li><strong>Restrict port forwards</strong> to the admin workstation and disable root login.</li>
+      <li><strong>Grow the osint-ubuntu disk</strong> and add swap or RAM to deb-siem.</li>
+      <li><strong>Prove detection:</strong> trigger failed logins until a lockout, create a test account, and show the 4625/4740/4720 alerts in the dashboard. Deploy an agent on wincli-client to collect 4625.</li>
+    </ol>
+
+    <h3>Later</h3>
+    <ul>
+      <li>SSH bastion (ProxyJump) instead of direct port forwards.</li>
+      <li>Wazuh active response: ban an IP on brute force.</li>
+      <li>Custom detection rules and MITRE ATT&amp;CK mapping.</li>
+      <li>Infrastructure as Code: tiers, ACLs and VMs in OpenTofu, configuration in Ansible.</li>
+      <li>A second domain controller and scheduled snapshots.</li>
+      <li>A Linux hardening baseline (nftables, auditd) on every VM.</li>
+    </ul>
+
+    <h2>Conclusion</h2>
+    <ul>
+      <li><strong>Segmented architecture:</strong> mostly done. Three tiers by trust level, lab ↔ enterprise isolation verified. The SIEM tier is still open.</li>
+      <li><strong>Enterprise environment:</strong> done. A working, hardened Active Directory.</li>
+      <li><strong>Network isolation:</strong> partial. The targeted deny works, but the risky zone still has Internet and can reach the SIEM.</li>
+      <li><strong>Centralized detection:</strong> collection done, detection still to prove.</li>
+    </ul>
+    <p>Most of what I learned came from the friction: quotas, system locks, broken configs, console limits, and finding the cause of each one step by step. The final audit is part of the same mindset. In blue team work, measuring the gap between what you think you deployed and what is really running is part of the job.</p>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      © 2026 gallbladder · <a href="mailto:the.real.gallbladder@proton.me">the.real.gallbladder@proton.me</a>
+    </div>
+  </footer>
+
+</body>
+</html>

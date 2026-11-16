@@ -1,0 +1,166 @@
+.post {
+  padding-top: 50px;
+}
+
+.back {
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+.post-meta {
+  margin: 30px 0 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.post h1 {
+  font-size: 42px;
+}
+
+.post-intro {
+  font-size: 19px;
+  color: var(--text-light);
+  margin: 14px 0 0;
+}
+
+.tags {
+  margin: 20px 0 0;
+}
+
+.tags span {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--red);
+  border: 1px solid var(--red);
+  padding: 2px 8px;
+  margin: 0 4px 6px 0;
+}
+
+.post h2 {
+  font-size: 26px;
+  margin: 50px 0 14px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.post h3 {
+  font-size: 19px;
+  margin: 28px 0 8px;
+}
+
+.post p,
+.post li {
+  margin: 0 0 12px;
+}
+
+.post ul,
+.post ol {
+  padding-left: 22px;
+}
+
+.post code {
+  font-family: var(--mono);
+  font-size: 14px;
+  background: var(--bg-card);
+  padding: 1px 5px;
+}
+
+.post pre {
+  background: #1F1A17;
+  color: #F8F5F1;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.post pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.box-info,
+.box-warn {
+  padding: 14px 18px;
+  margin: 16px 0;
+  background: var(--bg-card);
+  border-left: 4px solid var(--text-light);
+}
+
+.box-warn {
+  border-left-color: var(--red);
+}
+
+.box-info p:last-child,
+.box-warn p:last-child {
+  margin-bottom: 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 0 0 16px;
+}
+
+.post table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.post th,
+.post td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.post th {
+  font-family: var(--mono);
+  font-size: 13px;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.ok {
+  color: #1E7A46;
+}
+
+.bad {
+  color: var(--red);
+}
+
+.post figure {
+  margin: 20px 0;
+}
+
+.post figure img {
+  border: 1px solid var(--border);
+}
+
+.post figcaption {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.wide {
+  overflow-x: auto;
+}
+
+.wide img {
+  max-width: none;
+  width: 1100px;
+}
+
+@media (max-width: 600px) {
+  .post h1 {
+    font-size: 32px;
+  }
+}
